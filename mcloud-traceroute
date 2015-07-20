@@ -1,0 +1,478 @@
+#!/usr/bin/env python
+################################################################################
+#                                                                              #
+# Copyright (c) 2015 Steven Wong Systems                                       #
+# All Rights Reserved.                                                         #
+#                                                                              #
+#    Licensed under the Steven Wong License, Version 1.0 (the "License");      #
+#    you may not use this file except in compliance with the License.          #
+#    You may obtain a copy of the License at                                   #
+#                                                                              #
+#         http://www.stevenwong.org/licenses/LICENSE-1.0                       #
+#                                                                              #
+#    Unless required by applicable law or agreed to in writing, software       #
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT #
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the  #
+#    License for the specific language governing permissions and limitations   #
+#    under the License.                                                        #
+#                                                                              #
+################################################################################
+"""
+Lookup a route through the mCloud
+"""
+__author__ = 'Steven Wong'
+
+import sys
+from Exscript.protocols import SSH2
+from Exscript import Account
+
+mCloud_Router_Interface = {
+    "1.1.1.1" : "nyc-mcloud-pr01[Loopback0]",
+    "1.1.3.1" : "nyc-mcloud-pr01[TenGigE0/0/0/2]",
+    "1.1.3.9" : "nyc-mcloud-pr01[TenGigE0/1/0/2]",
+    "1.1.3.17" : "nyc-mcloud-pr01[TenGigE0/0/0/1]",
+    "1.1.3.21" : "nyc-mcloud-pr01[TenGigE0/1/0/1]",
+    "1.6.3.1" : "nyc-mcloud-pr01[TenGigE0/0/0/3]",
+    "1.7.3.1" : "nyc-mcloud-pr01[GigabitEthernet0/2/0/1]",
+    "1.8.3.1" : "nyc-mcloud-pr01[GigabitEthernet0/2/0/2]",
+    "1.12.3.1" : "nyc-mcloud-pr01[TenGigE0/1/0/3]",
+    "1.13.3.1" : "nyc-mcloud-pr01[GigabitEthernet0/2/0/3]",
+    "1.14.3.1" : "nyc-mcloud-pr01[GigabitEthernet0/2/0/4]",
+    "1.15.3.1" : "nyc-mcloud-pr01[TenGigE0/3/0/3]",
+    "1.18.3.1" : "nyc-mcloud-pr01[GigabitEthernet0/2/0/5]",
+    "1.99.1.1" : "nyc-mcloud-pr01[TenGigE0/0/0/0]",
+    "1.99.1.9" : "nyc-mcloud-pr01[TenGigE0/1/0/0]",
+    "1.99.1.41" : "nyc-mcloud-pr01[TenGigE0/3/0/0]",
+    "1.1.50.5" : "nyc-mcloud-pr01[Gig0/2/0/19]",
+    "1.1.1.2" : "nyc-mcloud-pr02[Loopback0]",
+    "1.1.3.5" : "nyc-mcloud-pr02[TenGigE0/0/0/2]",
+    "1.1.3.13" : "nyc-mcloud-pr02[TenGigE0/1/0/2]",
+    "1.1.3.18" : "nyc-mcloud-pr02[TenGigE0/0/0/1]",
+    "1.1.3.22" : "nyc-mcloud-pr02[TenGigE0/1/0/1]",
+    "1.7.3.5" : "nyc-mcloud-pr02[GigabitEthernet0/2/0/1]",
+    "1.8.3.5" : "nyc-mcloud-pr02[GigabitEthernet0/2/0/2]",
+    "1.12.3.5" : "nyc-mcloud-pr02[TenGigE0/1/0/3]",
+    "1.13.3.5" : "nyc-mcloud-pr02[GigabitEthernet0/2/0/3]",
+    "1.14.3.5" : "nyc-mcloud-pr02[GigabitEthernet0/2/0/4]",
+    "1.99.1.5" : "nyc-mcloud-pr02[TenGigE0/0/0/0]",
+    "1.99.1.13" : "nyc-mcloud-pr02[TenGigE0/1/0/0]",
+    "1.99.1.45" : "nyc-mcloud-pr02[TenGigE0/3/0/0]",
+    "1.1.50.9" : "nyc-mcloud-pr02[GigabitEthernet0/2/0/19]",
+    "1.1.2.1" : "nyc-mcloud-pe01[Loopback0]",
+    "1.1.3.2" : "nyc-mcloud-pe01[TenGigE0/0/0/2]",
+    "1.1.3.14" : "nyc-mcloud-pe01[TenGigE0/1/0/2]",
+    "1.1.3.25" : "nyc-mcloud-pe01[TenGigE0/0/0/1]",
+    "1.1.3.29" : "nyc-mcloud-pe01[TenGigE0/1/0/1]",
+    "100.123.2.1" : "nyc-mcloud-pe01[TenGigE0/0/0/0]",
+    "100.123.2.9" : "nyc-mcloud-pe01[TenGigE0/1/0/0]",
+    "1.1.2.2" : "nyc-mcloud-pe02[Loopback0]",
+    "1.1.3.6" : "nyc-mcloud-pe02[TenGigE0/0/0/2]",
+    "1.1.3.10" : "nyc-mcloud-pe02[TenGigE0/1/0/2]",
+    "1.1.3.26" : "nyc-mcloud-pe02[TenGigE0/0/0/1]",
+    "1.1.3.30" : "nyc-mcloud-pe02[TenGigE0/1/0/1]",
+    "100.123.2.5" : "nyc-mcloud-pe02[TenGigE0/0/0/0]",
+    "100.123.2.13" : "nyc-mcloud-pe02[TenGigE0/1/0/0]",
+
+    "1.2.1.1" : "eng-mcloud-pr01[Loopback0]",
+    "1.2.3.1" : "eng-mcloud-pr01[TenGigE0/0/0/2]",
+    "1.2.3.9" : "eng-mcloud-pr01[TenGigE0/1/0/2]",
+    "1.2.3.17" : "eng-mcloud-pr01[TenGigE0/0/0/1]",
+    "1.2.3.21" : "eng-mcloud-pr01[TenGigE0/1/0/1]",
+    "1.6.3.5" : "eng-mcloud-pr01[TenGigE0/0/0/3]",
+    "1.16.3.1" : "eng-mcloud-pr01[TenGigE0/1/0/3]",
+    "1.99.1.2" : "eng-mcloud-pr01[TenGigE0/0/0/0]",
+    "1.99.1.17" : "eng-mcloud-pr01[TenGigE0/1/0/0]",
+    "1.2.50.5" : "eng-mcloud-pr01[GigabitEthernet0/2/0/19]",
+    "1.2.1.2" : "eng-mcloud-pr02[Loopback0]",
+    "1.2.3.5" : "eng-mcloud-pr02[TenGigE0/0/0/2]",
+    "1.2.3.13" : "eng-mcloud-pr02[TenGigE0/1/0/2]",
+    "1.2.3.18" : "eng-mcloud-pr02[TenGigE0/0/0/1]",
+    "1.2.3.22" : "eng-mcloud-pr02[TenGigE0/1/0/1]",
+    "1.20.3.5" : "eng-mcloud-pr02[TenGigE0/2/0/1]",
+    "1.99.1.6" : "eng-mcloud-pr02[TenGigE0/0/0/0]",
+    "1.99.1.21" : "eng-mcloud-pr02[TenGigE0/1/0/0]",
+    "1.2.50.9" : "eng-mcloud-pr02[GigabitEthernet0/2/0/19]",
+    "1.2.2.1" : "eng-mcloud-pe01[Loopback0]",
+    "1.2.3.2" : "eng-mcloud-pe01[TenGigE0/0/0/2]",
+    "1.2.3.14" : "eng-mcloud-pe01[TenGigE0/1/0/2]",
+    "1.2.3.25" : "eng-mcloud-pe01[TenGigE0/0/0/1]",
+    "1.2.3.29" : "eng-mcloud-pe01[TenGigE0/1/0/1]",
+    "100.123.2.17" : "eng-mcloud-pe01[TenGigE0/0/0/0]",
+    "100.123.2.25" : "eng-mcloud-pe01[TenGigE0/1/0/0]",
+    "1.2.2.2" : "eng-mcloud-pe02[Loopback0]",
+    "1.2.3.6" : "eng-mcloud-pe02[TenGigE0/0/0/2]",
+    "1.2.3.10" : "eng-mcloud-pe02[TenGigE0/1/0/2]",
+    "1.2.3.26" : "eng-mcloud-pe02[TenGigE0/0/0/1]",
+    "1.2.3.30" : "eng-mcloud-pe02[TenGigE0/1/0/1]",
+    "100.123.2.21" : "eng-mcloud-pe02[TenGigE0/0/0/0]",
+    "100.123.2.29" : "eng-mcloud-pe02[TenGigE0/1/0/0]",
+
+    "1.3.1.1" : "ucs-mcloud-pr01[Loopback0]",
+    "1.3.3.1" : "ucs-mcloud-pr01[TenGigE0/0/0/2]",
+    "1.3.3.9" : "ucs-mcloud-pr01[TenGigE0/1/0/2]",
+    "1.3.3.17" : "ucs-mcloud-pr01[TenGigE0/0/0/1]",
+    "1.3.3.21" : "ucs-mcloud-pr01[TenGigE0/1/0/1]",
+    "1.9.3.1" : "ucs-mcloud-pr01[GigabitEthernet0/2/0/0]",
+    "1.99.1.10" : "ucs-mcloud-pr01[TenGigE0/1/0/0]",
+    "1.99.1.18" : "ucs-mcloud-pr01[TenGigE0/0/0/0]",
+    "1.99.1.49" : "ucs-mcloud-pr02[TenGigE0/0/0/3]",
+    "1.3.50.5" : "ucs-mcloud-pr01[GigabitEthernet0/2/0/19]",
+    "1.3.1.2" : "ucs-mcloud-pr02[Loopback0]",
+    "1.3.3.5" : "ucs-mcloud-pr02[TenGigE0/0/0/2]",
+    "1.3.3.13" : "ucs-mcloud-pr02[TenGigE0/1/0/2]",
+    "1.3.3.18" : "ucs-mcloud-pr02[TenGigE0/0/0/1]",
+    "1.3.3.22" : "ucs-mcloud-pr02[TenGigE0/1/0/1]",
+    "1.9.3.5" : "ucs-mcloud-pr01[GigabitEthernet0/2/0/0]",
+    "1.18.3.5" : "ucs-mcloud-pr01[GigabitEthernet0/2/0/5]",
+    "1.20.3.13" : "ucs-mcloud-pr02[TenGigE0/2/0/1]",
+    "1.99.1.14" : "ucs-mcloud-pr02[TenGigE0/1/0/0]",
+    "1.99.1.22" : "ucs-mcloud-pr02[TenGigE0/0/0/0]",
+    "1.99.1.53" : "ucs-mcloud-pr02[TenGigE0/0/0/3]",
+    "1.3.50.9" : "ucs-mcloud-pr02[GigabitEthernet0/2/0/19]",
+    "1.3.2.1" : "ucs-mcloud-pe01[Loopback0]",
+    "1.3.3.2" : "ucs-mcloud-pe01[TenGigE0/0/0/2]",
+    "1.3.3.14" : "ucs-mcloud-pe01[TenGigE0/1/0/2]",
+    "1.3.3.25" : "ucs-mcloud-pe01[TenGigE0/0/0/1]",
+    "1.3.3.29" : "ucs-mcloud-pe01[TenGigE0/1/0/1]",
+    "100.123.2.33" : "ucs-mcloud-pe01[TenGigE0/0/0/0]",
+    "100.123.2.41" : "ucs-mcloud-pe01[TenGigE0/1/0/0]",
+    "1.3.2.2" : "ucs-mcloud-pe02[Loopback0]",
+    "1.3.3.6" : "ucs-mcloud-pe02[TenGigE0/0/0/2]",
+    "1.3.3.10" : "ucs-mcloud-pe02[TenGigE0/1/0/2]",
+    "1.3.3.26" : "ucs-mcloud-pe02[TenGigE0/0/0/1]",
+    "1.3.3.30" : "ucs-mcloud-pe02[TenGigE0/1/0/1]",
+    "100.123.2.37" : "ucs-mcloud-pe02[TenGigE0/0/0/0]",
+    "100.123.2.45" : "ucs-mcloud-pe02[TenGigE0/1/0/0]",
+
+    "1.4.1.1" : "lon-nbcitn-pr01[Loopback0]",
+    "1.4.3.1" : "lon-nbcitn-pr01[TenGigE0/0/0/1]",
+    "1.4.3.9" : "lon-nbcitn-pr01[TenGigE0/1/0/1]",
+    "1.4.3.17" : "lon-nbcitn-pr01[TenGigE0/0/0/0]",
+    "1.4.3.21" : "lon-nbcitn-pr01[TenGigE0/1/0/0]",
+    "1.4.50.5" : "lon-nbcitn-pr01[GigabitEthernet0/0/0/19]",
+    "1.99.1.26" : "lon-nbcitn-pr01[GigabitEthernet0/0/0/1]",
+    "1.99.1.33" : "lon-nbcitn-pr01[GigabitEthernet0/0/0/0]",
+    "1.4.1.2" : "lon-nbcitn-pr02[Loopback0]",
+    "1.4.3.5" : "lon-nbcitn-pr02[TenGigE0/0/0/1]",
+    "1.4.3.13" : "lon-nbcitn-pr02[TenGigE0/1/0/1]",
+    "1.4.3.18" : "lon-nbcitn-pr02[TenGigE0/0/0/0]",
+    "1.4.3.22" : "lon-nbcitn-pr02[TenGigE0/1/0/0]",
+    "1.4.50.9" : "lon-nbcitn-pr02[GigabitEthernet0/0/0/19]",
+    "1.99.1.37" : "lon-nbcitn-pr02[GigabitEthernet0/0/0/0]",
+    "1.4.2.1" : "lon-nbcitn-pe01[Loopback0]",
+    "1.4.3.2" : "lon-nbcitn-pe01[TenGigE0/0/0/2]",
+    "1.4.3.14" : "lon-nbcitn-pe01[TenGigE0/0/0/3]",
+    "1.4.3.25" : "lon-nbcitn-pe01[TenGigE0/0/0/0]",
+    "1.4.3.29" : "lon-nbcitn-pe01[TenGigE0/0/0/1]",
+    "100.123.2.49" : "lon-nbcitn-pe01[GigabitEthernet0/0/1/0]",
+    "100.123.2.57" : "lon-nbcitn-pe01[GigabitEthernet0/0/1/1]",
+    "100.123.2.241" : "lon-nbcitn-pe01[GigabitEthernet0/0/1/4]",
+    "1.4.2.2" : "lon-nbcitn-pe02[Loopback0]",
+    "1.4.3.6" : "lon-nbcitn-pe02[TenGigE0/0/0/2]",
+    "1.4.3.10" : "lon-nbcitn-pe02[TenGigE0/0/0/3]",
+    "1.4.3.26" : "lon-nbcitn-pe02[TenGigE0/0/0/0]",
+    "1.4.3.30" : "lon-nbcitn-pe02[TenGigE0/0/0/1]",
+    "100.123.2.53" : "lon-nbcitn-pe02[GigabitEthernet0/0/1/0]",
+    "100.123.2.61" : "lon-nbcitn-pe02[GigabitEthernet0/0/1/1]",
+
+    "1.5.1.1" : "lon-romfdc-pr01[Loopback0]",
+    "1.5.3.1" : "lon-romfdc-pr01[TenGigE0/0/0/2]",
+    "1.5.3.9" : "lon-romfdc-pr01[TenGigE0/0/0/3]",
+    "1.5.3.17" : "lon-romfdc-pr01[TenGigE0/0/0/0]",
+    "1.5.3.21" : "lon-romfdc-pr01[TenGigE0/0/0/1]",
+    "1.99.1.30" : "lon-romfdc-pr01[GigabitEthernet0/0/1/1]",
+    "1.99.1.34" : "lon-romfdc-pr01[GigabitEthernet0/0/1/0]",
+    "1.5.1.2" : "lon-romfdc-pr02[Loopback0]",
+    "1.5.3.5" : "lon-romfdc-pr02[TenGigE0/0/0/2]",
+    "1.5.3.13" : "lon-romfdc-pr02[TenGigE0/0/0/3]",
+    "1.5.3.18" : "lon-romfdc-pr02[TenGigE0/0/0/0]",
+    "1.5.3.22" : "lon-romfdc-pr02[TenGigE0/0/0/1]",
+    "1.99.1.38" : "lon-romfdc-pr02[GigabitEthernet0/0/1/0]",
+    "1.5.2.1" : "lon-romfdc-pe01[Loopback0]",
+    "1.5.3.2" : "lon-romfdc-pe01[TenGigE0/0/0/2]",
+    "1.5.3.14" : "lon-romfdc-pe01[TenGigE0/0/0/3]",
+    "1.5.3.25" : "lon-romfdc-pe01[TenGigE0/0/0/0]",
+    "1.5.3.29" : "lon-romfdc-pe01[TenGigE0/0/0/1]",
+    "100.123.2.65" : "lon-romfdc-pe01[GigabitEthernet0/0/1/0]",
+    "100.123.2.73" : "lon-romfdc-pe01[GigabitEthernet0/0/1/1]",
+    "1.5.2.2" : "lon-romfdc-pe02[Loopback0]",
+    "1.5.3.6" : "lon-romfdc-pe02[TenGigE0/0/0/2]",
+    "1.5.3.10" : "lon-romfdc-pe02[TenGigE0/0/0/3]",
+    "1.5.3.26" : "lon-romfdc-pe02[TenGigE0/0/0/0]",
+    "1.5.3.30" : "lon-romfdc-pe02[TenGigE0/0/0/1]",
+    "100.123.2.69" : "lon-romfdc-pe02[GigabitEthernet0/0/1/0]",
+    "100.123.2.77" : "lon-romfdc-pe02[GigabitEthernet0/0/1/1]",
+
+    "1.6.2.1" : "sta-mcloud-pe01[Loopback0]",
+    "1.6.3.2" : "sta-mcloud-pe01[TenGigE0/0/0/0]",
+    "1.6.3.9" : "sta-mcloud-pe01[TenGigE0/1/0/0]",
+    "100.123.2.81" : "sta-mcloud-pe01[TenGigE0/0/0/1]",
+    "100.123.2.89" : "sta-mcloud-pe01[TenGigE0/1/0/1]",
+    "1.6.2.2" : "sta-mcloud-pe02[Loopback0]",
+    "1.6.3.6" : "sta-mcloud-pe02[TenGigE0/0/0/0]",
+    "1.6.3.10" : "sta-mcloud-pe02[TenGigE0/1/0/0]",
+    "100.123.2.85" : "sta-mcloud-pe02[TenGigE0/0/0/1]",
+    "100.123.2.93" : "sta-mcloud-pe02[TenGigE0/1/0/1]",
+
+    "1.7.2.1" : "phi-mcloud-pe01[Loopback0]",
+    "1.7.3.2" : "phi-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "1.7.3.9" : "phi-mcloud-pe01[GigabitEthernet0/0/0/1]",
+    "1.7.3.13" : "phi-mcloud-pe01[GigabitEthernet0/0/0/2]",
+    "100.123.2.185" : "phi-mcloud-pe01[GigabitEthernet0/0/0/3]",
+    "100.123.2.193" : "phi-mcloud-pe01[GigabitEthernet0/0/0/4]",
+    "1.7.2.2" : "phi-mcloud-pe02[Loopback0]",
+    "1.7.3.6" : "phi-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "1.7.3.10" : "phi-mcloud-pe02[GigabitEthernet0/0/0/1]",
+    "1.7.3.14" : "phi-mcloud-pe02[GigabitEthernet0/0/0/2]",
+    "100.123.2.197" : "phi-mcloud-pe02[GigabitEthernet0/0/0/3]",
+    "100.123.2.189" : "phi-mcloud-pe02[GigabitEthernet0/0/0/4]",
+
+    "1.8.2.1" : "har-mcloud-pe01[Loopback0]",
+    "1.8.3.2" : "har-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "1.8.3.9" : "har-mcloud-pe01[GigabitEthernet0/0/0/1]",
+    "1.8.3.13" : "har-mcloud-pe01[GigabitEthernet0/0/0/2]",
+    "100.123.2.201" : "har-mcloud-pe01[GigabitEthernet0/0/0/3]",
+    "100.123.2.209" : "har-mcloud-pe01[GigabitEthernet0/0/0/4]",
+    "1.8.2.2" : "har-mcloud-pe02[Loopback0]",
+    "1.8.3.6" : "har-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "1.8.3.10" : "har-mcloud-pe02[GigabitEthernet0/0/0/1]",
+    "1.8.3.14" : "har-mcloud-pe02[GigabitEthernet0/0/0/2]",
+    "100.123.2.213" : "har-mcloud-pe02[GigabitEthernet0/0/0/3]",
+    "100.123.2.205" : "har-mcloud-pe02[GigabitEthernet0/0/0/4]",
+
+    "1.9.2.1" : "snd-mcloud-pe01[Loopback0]",
+    "1.9.3.2" : "snd-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "1.9.3.9" : "snd-mcloud-pe01[GigabitEthernet0/0/0/1]",
+    "1.9.3.13" : "snd-mcloud-pe01[GigabitEthernet0/0/0/2]",
+    "100.123.2.217" : "snd-mcloud-pe01[GigabitEthernet0/0/0/3]",
+    "100.123.2.225" : "snd-mcloud-pe01[GigabitEthernet0/0/0/4]",
+    "1.9.2.2" : "snd-mcloud-pe02[Loopback0]",
+    "1.9.3.6" : "snd-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "1.9.3.10" : "snd-mcloud-pe02[GigabitEthernet0/0/0/1]",
+    "1.9.3.14" : "snd-mcloud-pe02[GigabitEthernet0/0/0/2]",
+    "100.123.2.229" : "snd-mcloud-pe02[GigabitEthernet0/0/0/3]",
+    "100.123.2.221" : "snd-mcloud-pe02[GigabitEthernet0/0/0/4]",
+
+    "1.10.1.1" : "ash-mcloud-pr01[Loopback0]",
+    "1.10.3.1" : "ash-mcloud-pr01[TenGigE0/0/0/2]",
+    "1.10.3.9" : "ash-mcloud-pr01[TenGigE0/1/0/2]",
+    "1.10.3.17" : "ash-mcloud-pr01[TenGigE0/0/0/1]",
+    "1.10.3.21" : "ash-mcloud-pr01[TenGigE0/1/0/1]",
+    "1.99.1.42" : "ash-mcloud-pr01[TenGigE0/0/0/0]",
+    "1.99.1.50" : "ash-mcloud-pr01[TenGigE0/1/0/0]",
+    "1.10.1.2" : "ash-mcloud-pr02[Loopback0]",
+    "1.10.3.5" : "ash-mcloud-pr02[TenGigE0/0/0/2]",
+    "1.10.3.13" : "ash-mcloud-pr02[TenGigE0/1/0/2]",
+    "1.10.3.18" : "ash-mcloud-pr02[TenGigE0/0/0/1]",
+    "1.10.3.22" : "ash-mcloud-pr02[TenGigE0/1/0/1]",
+    "1.99.1.46" : "ash-mcloud-pr02[TenGigE0/0/0/0]",
+    "1.99.1.54" : "ash-mcloud-pr02[TenGigE0/1/0/0]",
+    "1.10.2.1" : "ash-mcloud-pe01[Loopback0]",
+    "1.10.3.2" : "ash-mcloud-pe01[TenGigE0/0/0/2]",
+    "1.10.3.14" : "ash-mcloud-pe01[TenGigE0/1/0/2]",
+    "1.10.3.25" : "ash-mcloud-pe01[TenGigE0/0/0/1]",
+    "1.10.3.29" : "ash-mcloud-pe01[TenGigE0/1/0/1]",
+    "100.123.3.1" : "ash-mcloud-pe01[GigabitEthernet0/1/1/19]",
+    "100.123.3.113" : "ash-mcloud-pe01[TenGigE0/0/0/0.901]",
+    "100.123.3.121" : "ash-mcloud-pe01[TenGigE0/0/1/0.904]",
+    "100.123.3.129" : "ash-mcloud-pe01[TenGigE0/0/1/1.951]",
+    "100.123.3.137" : "ash-mcloud-pe01[TenGigE0/1/0/0.954]",
+    "100.123.3.245" : "ash-mcloud-pe01[TenGigE0/1/0/3]",
+    "1.10.2.2" : "ash-mcloud-pe02[Loopback0]",
+    "1.10.3.6" : "ash-mcloud-pe02[TenGigE0/0/0/2]",
+    "1.10.3.10" : "ash-mcloud-pe02[TenGigE0/1/0/2]",
+    "1.10.3.26" : "ash-mcloud-pe02[TenGigE0/0/0/1]",
+    "1.10.3.30" : "ash-mcloud-pe02[TenGigE0/1/0/1]",
+    "100.123.3.117" : "ash-mcloud-pe02[TenGigE0/0/1/0.903]",
+    "100.123.3.125" : "ash-mcloud-pe02[TenGigE0/0/0/0.902]",
+    "100.123.3.133" : "ash-mcloud-pe02[TenGigE0/1/0/0.953]",
+    "100.123.3.141" : "ash-mcloud-pe02[TenGigE0/0/1/1.952]",
+    "100.123.3.249" : "ash-mcloud-pe02[TenGigE0/1/0/3]",
+
+    "1.11.2.1" : "den-potcrp-pe01[Loopback0]",
+    "1.11.2.2" : "den-potcrp-pe02[Loopback0]",
+
+    "1.12.2.1" : "nyc-5timsq-pe01[Loopback0]",
+    "1.12.3.2" : "nyc-5timsq-pe01[TenGigE0/0/0/0]",
+    "1.12.3.9" : "nyc-5timsq-pe01[TenGigE0/1/0/0]",
+    "100.123.3.193" : "nyc-5timsq-pe01[TenGigE0/0/0/1]",
+    "100.123.3.201" : "nyc-5timsq-pe01[TenGigE0/1/0/1]",
+    "1.12.2.2" : "nyc-5timsq-pe02[Loopback0]",
+    "1.12.3.6" : "nyc-5timsq-pe02[TenGigE0/0/0/0]",
+    "1.12.3.10" : "nyc-5timsq-pe02[TenGigE0/1/0/0]",
+    "100.123.3.197" : "nyc-5timsq-pe01[TenGigE0/0/0/0]",
+    "100.123.3.205" : "nyc-5timsq-pe01[TenGigE0/1/0/0]",
+
+    "1.13.2.1" : "mia-mcloud-pe01[Loopback0]",
+    "1.13.3.2" : "mia-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "1.13.3.9" : "mia-mcloud-pe01[GigabitEthernet0/0/0/1]",
+    "100.123.3.177" : "mia-mcloud-pe01[GigabitEthernet0/0/0/2]",
+    "100.123.3.185" : "mia-mcloud-pe01[GigabitEthernet0/0/0/3]",
+    "1.13.2.2" : "mia-mcloud-pe02[Loopback0]",
+    "1.13.3.6" : "mia-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "1.13.3.10" : "mia-mcloud-pe02[GigabitEthernet0/0/0/1]",
+    "100.123.3.181" : "mia-mcloud-pe02[GigabitEthernet0/0/0/3]",
+    "100.123.3.189" : "mia-mcloud-pe02[GigabitEthernet0/0/0/2]",
+    "3.152.5.57" : "mia-mcloud-pe02[GigabitEthernet0/0/0/8]",
+
+    "1.14.2.1" : "chi-mcloud-pe01[Loopback0]",
+    "1.14.3.2" : "chi-mcloud-pe01[GigabitEthernet0/0/0/19]",
+    "1.14.3.9" : "chi-mcloud-pe01[GigabitEthernet0/0/0/18]",
+    "100.123.3.217" : "chi-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "100.123.3.225" : "chi-mcloud-pe01[GigabitEthernet0/0/0/1]",
+    "1.14.2.2" : "chi-mcloud-pe02[Loopback0]",
+    "1.14.3.6" : "chi-mcloud-pe02[GigabitEthernet0/0/0/19]",
+    "1.14.3.10" : "chi-mcloud-pe02[GigabitEthernet0/0/0/18]",
+    "100.123.3.221" : "chi-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "100.123.3.229" : "chi-mcloud-pe02[GigabitEthernet0/0/0/1]",
+
+    "1.15.2.1" : "hia-mcloud-pe01[Loopback0]",
+    "1.15.3.2" : "hia-mcloud-pe01[TenGigE0/0/1/0]",
+    "1.15.3.13" : "hia-mcloud-pe01[TenGigE0/0/1/1]",
+    "1.15.3.9" : "hia-mcloud-pe01[TenGigE0/0/1/7]",
+    "100.123.4.1" : "hia-mcloud-pe01[TenGigE0/0/1/2]",
+    "100.123.4.9" : "hia-mcloud-pe01[TenGigE0/0/1/3]",
+    "3.135.1.89" : "hia-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "3.135.1.133" : "hia-mcloud-pe01[GigabitEthernet0/0/0/5]",
+    "100.120.1.49" : "hia-mcloud-pe01[GigabitEthernet0/0/0/8]",
+    "100.120.1.209" : "hia-mcloud-pe01[GigabitEthernet0/0/0/10]",
+    "1.15.2.2" : "hia-mcloud-pe02[Loopback0]",
+    "1.15.3.10" : "hia-mcloud-pe02[TenGigE0/0/1/7]",
+    "1.15.3.14" : "hia-mcloud-pe02[TenGigE0/0/1/1]",
+    "1.99.1.57" : "hia-mcloud-pe02[TenGigE0/0/1/0]",
+    "100.123.4.5" : "hia-mcloud-pe02[TenGigE0/0/1/3]",
+    "100.123.4.13" : "hia-mcloud-pe02[TenGigE0/0/1/2]",
+    "3.135.1.57" : "hia-mcloud-pe02[GigabitEthernet0/0/0/6]",
+    "3.135.1.69" : "hia-mcloud-pe02[GigabitEthernet0/0/0/0]",
+    "3.135.1.81" : "hia-mcloud-pe02[GigabitEthernet0/0/0/1]",
+    "3.135.1.161" : "hia-mcloud-pe02[GigabitEthernet0/0/0/5]",
+    "3.135.1.181" : "hia-mcloud-pe02[GigabitEthernet0/0/0/4]",
+
+    "1.16.2.1" : "orl-mcloud-pe01[Loopback0]",
+    "1.16.3.2" : "orl-mcloud-pe01[TenGigE0/0/1/0]",
+    "1.16.3.9" : "orl-mcloud-pe01[TenGigE0/0/1/1]",
+    "1.16.3.13" : "orl-mcloud-pe01[TenGigE0/0/1/7]",
+    "100.123.7.249" : "orl-mcloud-pe01[TenGigE0/0/1/3]",
+    "3.135.1.65" : "orl-mcloud-pe01[GigabitEthernet0/0/0/0]",
+    "1.16.2.2" : "orl-mcloud-pe02[Loopback0]",
+    "1.16.3.10" : "orl-mcloud-pe02[TenGigE0/0/1/1]",
+    "1.16.3.14" : "orl-mcloud-pe02[TenGigE0/0/1/7]",
+    "1.99.1.58" : "orl-mcloud-pe02[TenGigE0/0/1/0]",
+    "100.123.7.253" : "orl-mcloud-pe02[TenGigE0/0/1/3]",
+    "3.3.250.114" : "orl-mcloud-pe02[GigabitEthernet0/0/0/0]",
+
+    "1.17.2.1" : "mir-mcloud-pe01[Loopback0]",
+    "1.17.2.2" : "mir-mcloud-pe02[Loopback0]",
+
+    "1.18.2.1" : "ftw-mcloud-pe01[Loopback0]",
+    "1.18.3.2" : "ftw-mcloud-pe01[GigabitEthernet0/0/1/0]",
+    "1.18.3.9" : "ftw-mcloud-pe01[TenGigE0/0/2/1]",
+    "1.18.3.13" : "ftw-mcloud-pe01[TenGigE0/0/2/3]",
+    "100.123.4.49" : "ftw-mcloud-pe01[TenGigE0/0/2/0]",
+    "100.123.4.57" : "ftw-mcloud-pe01[TenGigE0/0/2/2]",
+    "100.121.4.58" : "ftw-mcloud-pe01[GigabitEthernet0/0/1/1]",
+    "1.18.2.2" : "ftw-mcloud-pe02[Loopback0]",
+    "1.18.3.6" : "ftw-mcloud-pe02[GigabitEthernet0/0/1/0]",
+    "1.18.3.10" : "ftw-mcloud-pe02[TenGigE0/0/2/1]",
+    "1.18.3.14" : "ftw-mcloud-pe02[TenGigE0/0/2/3]",
+    "100.123.4.53" : "ftw-mcloud-pe02[TenGigE0/0/2/2]",
+    "100.123.4.61" : "ftw-mcloud-pe02[TenGigE0/0/2/0]",
+    "100.121.4.54" : "ftw-mcloud-pe02[GigabitEthernet0/0/1/11]",
+
+    "1.19.2.1" : "sin-mcloud-pe01[Loopback0]",
+    "1.19.2.2" : "sin-mcloud-pe02[Loopback0]",
+
+    "1.20.2.1" : "den-drycrk-pe01[Loopback0]",
+    "1.20.3.6" : "den-drycrk-pe01[TenGigE0/1/0/0]",
+    "1.20.3.10" : "den-drycrk-pe01[TenGigE0/0/0/0]",
+    "1.20.3.17" : "den-drycrk-pe01[TenGigE0/0/0/1]",
+    "100.123.4.81" : "den-drycrk-pe01[TenGigE0/0/0/2]",
+    "100.123.4.89" : "den-drycrk-pe01[TenGigE0/1/0/1]",
+    "1.20.2.2" : "den-drycrk-pe02[Loopback0]",
+    "1.20.3.2" : "den-drycrk-pe02[TenGigE0/0/0/0]",
+    "1.20.3.14" : "den-drycrk-pe02[TenGigE0/1/0/0]",
+    "1.20.3.18" : "den-drycrk-pe01[TenGigE0/0/0/1]",
+    "100.123.4.85" : "den-drycrk-pe02[TenGigE0/1/0/1]",
+    "100.123.4.93" : "den-drycrk-pe02[TenGigE0/0/0/2]"
+}
+
+def main():
+    # Input Section
+    user = raw_input("Enter Username: ")
+    password = raw_input("Enter Password: ")
+    source_router = raw_input ("Enter Source Router: ")
+
+    # Exscript Login Process
+    account = Account(user, password)
+    conn = SSH2()
+    conn.connect(source_router)
+    conn.login(account)
+
+    # Initial Search
+    ip_search = raw_input ("Enter Destination: ")
+
+    # Begin Program
+    while True:
+        global_table_lookup = "show route vrf nbcu-corp "+ip_search+"\n"
+        conn.execute(global_table_lookup)
+        global_result = conn.response.split()
+
+        # Show Route Type
+        if global_result[17] == '"bgp':
+            print "BGP Route - Learned through mCloud"
+        elif global_result[17] == '"eigrp':
+            print "EIGRP Route - Learned from IGP - Program will exit"
+            break
+
+        # Show Correct Prefix
+        correct_prefix = global_result[14]
+        print ("Destination falls into prefix: "+correct_prefix)
+
+        # Show Destination mCloud Router
+        destination_mcloud_router = global_result[34][:-1]
+        print ("Destination mCloud Router: "+destination_mcloud_router+"("+mCloud_Router_Interface[destination_mcloud_router]+")")
+
+        # MPLS Traceroute to Destination mCloud Router
+        mpls_traceroute = "trace mpls ipv4 "+destination_mcloud_router+"/32\n"
+        conn.execute(mpls_traceroute)
+        trace_result = conn.response.split()
+        first_label_lookup = "show mpls ldp ipv4 forwarding "+destination_mcloud_router+"/32\n"
+        conn.execute(first_label_lookup)
+        first_label_assigned = conn.response.split()
+        label_in = first_label_assigned[68]
+        trace_hops = []
+        trace_labels = []
+        label_check = False
+
+        for trace_item in trace_result:
+            if trace_item[0:2] == "1.":
+                trace_hops.append(trace_item)
+            if label_check == True:
+                trace_labels.append(trace_item)
+                label_check = False
+            if trace_item[1:8] == "Labels:":
+                label_check = True
+
+        trace_hops.pop(0)
+        trace_hops.pop(0)
+        trace_labels.append("")
+
+        for item in range(0,len(trace_hops)):
+            label_out = trace_labels[item]
+            print (trace_hops[item]+"("+mCloud_Router_Interface[trace_hops[item]]+") "+"Label In "+label_in+" Label Out "+label_out)
+            label_in = label_out
+
+        # Enter Again or Quit
+        print("\n")
+        user_query = raw_input("Enter Destination or (q)uit: ")
+        if user_query == "q":
+            break
+        else:
+            ip_search = user_query
+
+    # End Program
+    conn.send('exit\r')
+    conn.close()
+
+if __name__ == "__main__":
+    sys.exit(main())
